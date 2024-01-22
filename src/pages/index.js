@@ -1,66 +1,77 @@
 import React, { useState } from "react";
 
-import Image from "next/image";
 import { Inter } from "next/font/google";
 
 const inter = Inter({ subsets: ["latin"] });
 
+const SUMARIZE_URL = "http://localhost:3000/api/summarize";
+
 export default function Home() {
   const [summary, setSummary] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  React.useEffect(() => {
-    document
-      .getElementById("file-input")
-      .addEventListener("change", (event) => {
-        const file = event.target.files[0];
-        if (file.type !== "application/pdf") {
-          console.error(file.name, "is not a PDF file.");
-          return;
-        }
 
-        const fileReader = new FileReader();
-
-        fileReader.onload = function () {
-          const typedarray = new Uint8Array(this.result);
-
-          // Load the PDF file.
-          pdfjsLib.getDocument({ data: typedarray }).promise.then((pdf) => {
-            console.log("PDF loaded");
-
-            // Fetch the first page
-            pdf.getPage(1).then((page) => {
-              console.log("Page loaded");
-
-              // Get text from the page
-              page.getTextContent().then((textContent) => {
-                let text = "";
-                textContent.items.forEach((item) => {
-                  text += item.str + " ";
-                });
-
-                // Display text content
-                document.getElementById("pdfContent").innerText = text;
-                setIsLoading(true);
-                const response = fetch("http://localhost:3000/api/hello", {
-                  method: "POST",
-                  body: JSON.stringify({
-                    text,
-                  }),
-                })
-                  .then((res) => res.json())
-                  .then((data) => {
-                    console.log('***', data)
-                    setIsLoading(false)
-                    setSummary(data.message.content);
-                  });
-              });
-            });
-          });
-        };
-
-        fileReader.readAsArrayBuffer(file);
+  const summarizeText = (text) => {
+    fetch(SUMARIZE_URL, {
+      method: "POST",
+      body: JSON.stringify({
+        text,
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        setIsLoading(false);
+        setSummary(data.message.content);
       });
+  };
+
+  const onLoadFile = function () {
+    const typedarray = new Uint8Array(this.result);
+
+    // Load the PDF file.
+    pdfjsLib.getDocument({ data: typedarray }).promise.then((pdf) => {
+      console.log("PDF loaded");
+
+      // Fetch the first page
+      pdf.getPage(1).then((page) => {
+        console.log("Page loaded");
+
+        // Get text from the page
+        page.getTextContent().then((textContent) => {
+          let text = "";
+          textContent.items.forEach((item) => {
+            text += item.str + " ";
+          });
+
+          // Display text content
+          document.getElementById("pdfContent").innerText = text;
+          setIsLoading(true);
+          summarizeText(text);
+        });
+      });
+    });
+  };
+
+  const onChangeFileInput = (event) => {
+    const file = event.target.files[0];
+    if (file.type !== "application/pdf") {
+      console.error(file.name, "is not a PDF file.");
+      return;
+    }
+
+    const fileReader = new FileReader();
+
+    fileReader.onload = onLoadFile;
+
+    fileReader.readAsArrayBuffer(file);
+  };
+
+  React.useEffect(() => {
+    const fileInput = document.getElementById("file-input");
+    if (fileInput) {
+      fileInput.addEventListener("change", onChangeFileInput);
+    }
   }, []);
+
   return (
     <main
       className={`flex min-h-screen bg-gray-100 flex-col items-center p-24 ${inter.className}`}
@@ -95,8 +106,12 @@ export default function Home() {
         </div>
 
         <div className="w-1/2">
-          <h2 className="text-center mb-4 text-3xl text-black">Summarized text</h2>
-          {isLoading && <p className="text-black text-center">Connecting to Octo AI...</p>}
+          <h2 className="text-center mb-4 text-3xl text-black">
+            Summarized text
+          </h2>
+          {isLoading && (
+            <p className="text-black text-center">Connecting to Octo AI...</p>
+          )}
           {!isLoading && (
             <>
               <div className="text-black">{summary}</div>
